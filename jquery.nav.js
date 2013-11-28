@@ -31,6 +31,8 @@
 		this.didScroll = false;
 		this.$doc = $(document);
 		this.docHeight = this.$doc.height();
+
+		this.isHorizontal = false;
 	};
 
 	// the plugin prototype
@@ -62,6 +64,9 @@
 			
 			//Handle clicks on the nav
 			self.$nav.on('click.onePageNav', $.proxy(self.handleClick, self));
+
+			//Get scroll direciton
+			self.getDirection();
 
 			//Get the section positions
 			self.getPositions();
@@ -108,11 +113,46 @@
 		getHash: function($link) {
 			return $link.attr('href').split('#')[1];
 		},
+
+		getDirection: function(){
+			var self = this;
+			var linkHref;
+			var topPos;
+			var topPosPre;
+			var leftPos;
+			var leftPosPre;
+			var $target;
+
+			self.$nav.each(function() {
+				linkHref = self.getHash($(this));
+				$target = $('#' + linkHref);
+
+				if($target.length) {
+					topPos = $target.offset().top;
+					leftPos = $target.offset().left;
+
+					if(topPosPre != null) {
+						if (topPos - topPosPre > 0){
+							return false;
+						}
+					}
+
+					if(leftPosPre != null) {
+						if (leftPos - leftPosPre > 0){
+							self.isHorizontal = true;
+							return false	;
+						}
+					}
+					topPosPre = topPos;
+					leftPosPre = leftPos;
+				}
+			});
+		},
 		
 		getPositions: function() {
 			var self = this;
 			var linkHref;
-			var topPos;
+			var pos;
 			var $target;
 			
 			self.$nav.each(function() {
@@ -120,18 +160,28 @@
 				$target = $('#' + linkHref);
 
 				if($target.length) {
-					topPos = $target.offset().top;
-					self.sections[linkHref] = Math.round(topPos) - self.config.scrollOffset;
+					if(!self.isHorizontal) {
+						pos = $target.offset().top;
+					} else {
+						pos = $target.offset().left;
+					}
+					self.sections[linkHref] = Math.round(pos) - self.config.scrollOffset;
 				}
 			});
 		},
 		
 		getSection: function(windowPos) {
 			var returnValue = null;
-			var windowHeight = Math.round(this.$win.height() * this.config.scrollThreshold);
+			var windowHW = null;
+
+			if(!this.isHorizontal) {
+				windowHW = Math.round(this.$win.height() * this.config.scrollThreshold);
+			} else {
+				windowHW = Math.round(this.$win.width() * this.config.scrollThreshold);
+			}
 
 			for(var section in this.sections) {
-				if((this.sections[section] - windowHeight) < windowPos) {
+				if((this.sections[section] - windowHW) < windowPos) {
 					returnValue = section;
 				}
 			}
@@ -185,10 +235,17 @@
 		},
 		
 		scrollChange: function() {
-			var windowTop = this.$win.scrollTop();
-			var position = this.getSection(windowTop);
+			var windowTopLeft;
+			var position;
 			var $parent;
 			
+			if(!this.isHorizontal) {
+				windowTopLeft = this.$win.scrollTop();
+			} else {
+				windowTopLeft = this.$win.scrollLeft();
+			}
+			position = this.getSection(windowTopLeft);
+
 			//If the position is set
 			if(position !== null) {
 				$parent = this.$elem.find('a[href$="#' + position + '"]').parent();
